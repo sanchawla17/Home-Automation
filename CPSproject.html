@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Records</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #333;
+            color: white;
+        }
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Attendance Records</h1>
+        <div id="attendanceDate"></div>
+        <div id="attendancePercentage"></div>
+        <table id="attendanceTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Text</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <script>
+        fetch('rfid_data.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(text => {
+                const tableBody = document.querySelector('#attendanceTable tbody');
+                const attendanceDate = document.querySelector('#attendanceDate');
+                const attendancePercentage = document.querySelector('#attendancePercentage');
+
+                const records = text.trim().split('\n').map(line => {
+                    const { id, text, timestamp } = JSON.parse(line);
+                    return { id, text: text.trim(), timestamp };
+                });
+
+                // Filtering unique text values
+                const uniqueTextValues = Array.from(new Set(records.map(record => record.text)));
+
+                const firstRecordDate = new Date(records[0].timestamp).toLocaleDateString();
+                attendanceDate.innerText = `Attendance Date: ${firstRecordDate}`;
+
+                let lateThreshold = 14; // Late threshold in minutes
+                let totalStudents = uniqueTextValues.length;
+                let lateCount = 0;
+
+                uniqueTextValues.forEach(textValue => {
+                    let late = false;
+                    records.forEach(record => {
+                        if (record.text === textValue) {
+                            const recordTime = new Date(record.timestamp);
+                            const currentTime = new Date();
+                            const minutesDifference = (currentTime - recordTime) / (1000 * 60);
+                            if (minutesDifference > lateThreshold) {
+                                late = true;
+                            }
+                        }
+                    });
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${records.find(record => record.text === textValue).id}</td>
+                        <td>${textValue}</td>
+                        <td>${new Date(records.find(record => record.text === textValue).timestamp).toLocaleDateString()}</td>
+                        <td>${new Date(records.find(record => record.text === textValue).timestamp).toLocaleTimeString()}</td>
+                    `;
+
+                    if (late) {
+                        row.style.color = 'red';
+                        lateCount++;
+                    }
+
+                    tableBody.appendChild(row);
+                });
+
+                // Calculate attendance percentage
+                let attendancePercentageValue = ((totalStudents - lateCount) / totalStudents) * 100;
+                attendancePercentage.innerText = `Attendance Percentage: ${attendancePercentageValue.toFixed(2)}%`;
+            })
+            .catch(error => console.error('Error fetching attendance data:', error));
+    </script>
+</body>
+</html>
